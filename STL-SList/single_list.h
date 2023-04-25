@@ -5,13 +5,18 @@
 #include <initializer_list>
 #include <compare>
 
-
+#pragma optimize("",off)
+template<class T, class Allocator = std::allocator<T>> //forward declare for friend classes to access private members
+class single_list;
 
 template<class T>
 class Node
 {
 public:
-    Node():next_(nullptr){}
+    Node():next_(nullptr){
+        int i = 2;
+        val_ = (T)12;
+    }
     Node(const T& val, Node* next) : val_(val), next_(next){}
     Node(T&& val, Node* next) : val_(std::move(val)), next_(next){}
     template<typename... Args>
@@ -31,14 +36,17 @@ private:
 	T val_;
     Node* next_;
 
+    template<class T, class Allocator>
+    friend class single_list;
 
 };
 
 
 template<class T>
-class slist_iterator : public std::iterator<std::forward_iterator_tag, Node<T>>
+class slist_iterator
 {
 public:
+    typedef slist_iterator _Unchecked_type;
     using iterator_category = std::forward_iterator_tag;
     using difference_type = std::ptrdiff_t;
     using value_type = T;
@@ -88,11 +96,14 @@ public:
 
 private:
     Node<value_type>* m_ptr_ = nullptr;
+
+    template<class T, class Allocator>
+    friend class single_list;
 };
 
 
 
-template<class T, class Allocator = std::allocator<T>>
+template<class T, class Allocator>
 class single_list
 {
 
@@ -108,23 +119,23 @@ public:
     using size_type = std::size_t;
     using difference_type = std::ptrdiff_t;
     using iterator = slist_iterator<T>;
-    using const_iterator = slist_iterator<const T>;
+    using const_iterator = slist_iterator<T>; //this should be slist_iterator<const T> but then i can't renturn an iterator :)
     using node_type = Node<value_type>;
     using node_pointer = node_type*;
 
     // construct/copy/destroy
     single_list() : single_list(Allocator()) { }
-    explicit single_list(const Allocator& al) : m_head_(node_type()), allocator_(al) {}
-    explicit single_list(size_type n, const Allocator& al = Allocator()) : m_head_(node_type()), allocator_(al)
+    explicit single_list(const Allocator& al) : m_head_(new node_type()), allocator_(al) {}
+    explicit single_list(size_type n, const Allocator& al = Allocator()) : m_head_(new node_type()), allocator_(al)
     {
         resize(n);
     }
-    single_list(size_type n, const_reference value, const Allocator& al = Allocator()) : m_head_(node_type()), allocator_(al)
+    single_list(size_type n, const_reference value, const Allocator& al = Allocator()) : m_head_(new node_type()), allocator_(al)
     {
         resize(n, value);
     }
     template<class InputIt>
-    single_list(InputIt first, InputIt last, const Allocator& al = Allocator()) : m_head_(node_type()), allocator_(al)
+    single_list(InputIt first, InputIt last, const Allocator& al = Allocator()) : m_head_(new node_type()), allocator_(al)
     {
         insert_after(before_begin(), first, last);
     }
@@ -141,7 +152,7 @@ public:
         m_head_->next_ = x.m_head_->next_;
         x.m_head_->next_ = nullptr;
     }
-    single_list(std::initializer_list<T> il, const Allocator& al = Allocator()) : m_head_(node_type()), allocator_(al)
+    single_list(std::initializer_list<T> il, const Allocator& al = Allocator()) : m_head_(new node_type()), allocator_(al)
     {
         insert_after(before_begin(), il.begin(), il.end());
     }
@@ -313,8 +324,11 @@ public:
     {
         assert(position.m_ptr_);
         node_pointer oldNext = position.m_ptr_->next_;
-        node_pointer newNode = alloc_traits::allocate(allocator_, 1);
-        alloc_traits::construct(allocator_, newNode, x, oldNext);
+        //node_pointer newNode = alloc_traits::allocate(allocator_, 1);
+        //alloc_traits::construct(allocator_, newNode, x, oldNext);
+        auto newNodePtr = alloc_traits::allocate(allocator_, 1); //idk
+        alloc_traits::construct(allocator_, newNodePtr, x, oldNext);
+        node_pointer newNode = (node_pointer)newNodePtr
         position.m_ptr_->next_ = newNode;
         return iterator(newNode);
     }
@@ -367,21 +381,20 @@ public:
         assert(first.m_ptr_);
         if (first == last)
             return first;
-
         node_pointer before = first.m_ptr_;
         node_pointer lastNode = last != cend() ? last.m_ptr_ : nullptr;
         for (;;)
         {
-            const auto itemToDelete = before->next_;
+            node_pointer itemToDelete = before->next_;
             if (itemToDelete == lastNode)
             {
                 break;
             }
             before->next_ = itemToDelete->next_;
-            alloc_traits::destroy(allocator_, itemToDelete);
-            alloc_traits::deallocate(allocator_, itemToDelete, 1);
+            alloc_traits::destroy(allocator_, (int*)itemToDelete);
+            alloc_traits::deallocate(allocator_, (int*)itemToDelete, 1);
         }
-        return last;
+        return iterator(last.m_ptr_);
     }
     void swap(single_list& other)
         noexcept(std::allocator_traits<Allocator>::is_always_equal::value)
