@@ -7,8 +7,6 @@
 
 int main()
 {
-    std::forward_list<int> aaa;
-    //aaa.erase_after();
     single_list<int32_t> testList;
     testList.push_front(14);
     std::cout << "Hello World!\n";

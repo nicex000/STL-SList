@@ -5,7 +5,6 @@
 #include <initializer_list>
 #include <compare>
 
-#pragma optimize("",off)
 template<class T, class Allocator = std::allocator<T>> //forward declare for friend classes to access private members
 class single_list;
 
@@ -13,10 +12,7 @@ template<class T>
 class Node
 {
 public:
-    Node():next_(nullptr){
-        int i = 2;
-        val_ = (T)12;
-    }
+    Node():next_(nullptr){}
     Node(const T& val, Node* next) : val_(val), next_(next){}
     Node(T&& val, Node* next) : val_(std::move(val)), next_(next){}
     template<typename... Args>
